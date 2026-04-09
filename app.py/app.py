@@ -1,183 +1,228 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import plotly.express as px
+import numpy as np
 
-st.set_page_config(
-    page_title="Airline Flight Delay Analytics",
-    page_icon="✈️",
-    layout="wide"
-)
+st.set_page_config(page_title="Flight Delay Intelligence System", layout="wide")
 
 # Load data
 df = pd.read_excel("data/indian_flight_delay_realistic.xlsx")
 
+# Generate hour column if missing
+if "Departure_Hour" not in df.columns:
+    df["Departure_Hour"] = np.random.randint(0,24,len(df))
+
+# Load ML model
 model = joblib.load("Models/flight_delay_model.pkl")
 features = joblib.load("Models/model_features.pkl")
 
-# Sidebar navigation
-page = st.sidebar.selectbox(
-    "Navigation",
-    ["✈️ Delay Prediction","📊 Operations Analytics"]
+st.title("✈️ Indian Aviation Flight Delay Intelligence System")
+
+st.markdown(
+"""
+Machine learning powered delay prediction combined with airline operational analytics.
+"""
 )
 
-# ================================
-# PAGE 1 : PREDICTION SYSTEM
-# ================================
+# ---------------- SIDEBAR ---------------- #
 
-if page == "✈️ Delay Prediction":
+st.sidebar.header("Flight Parameters")
 
-    st.title("✈️ Flight Delay Prediction System")
+airports = ["DEL","BOM","BLR","HYD","MAA","CCU","PNQ","AMD"]
 
-    st.write("Predict whether a flight will be delayed (>30 minutes)")
+airline = st.sidebar.selectbox(
+    "Airline",
+    ["IndiGo","Air India","Vistara","SpiceJet","Akasa Air"]
+)
 
-    st.sidebar.header("Flight Parameters")
+origin = st.sidebar.selectbox(
+    "Origin Airport",
+    airports
+)
 
-    airline = st.sidebar.selectbox(
-        "Airline",
-        ["IndiGo","Air India","Vistara","SpiceJet","Akasa Air"]
+destination = st.sidebar.selectbox(
+    "Destination Airport",
+    [a for a in airports if a != origin]
+)
+
+origin_weather = st.sidebar.selectbox(
+    "Origin Weather",
+    ["Clear","Fog","Rain","Storm"]
+)
+
+dest_weather = st.sidebar.selectbox(
+    "Destination Weather",
+    ["Clear","Fog","Rain","Storm"]
+)
+
+turnaround = st.sidebar.slider(
+    "Turnaround Time (minutes)",
+    20,120,40
+)
+
+cancelled = st.sidebar.selectbox(
+    "Cancelled",
+    [0,1]
+)
+
+diverted = st.sidebar.selectbox(
+    "Diverted",
+    [0,1]
+)
+
+# ---------------- PREDICTION ---------------- #
+
+st.header("🔮 Flight Delay Prediction")
+
+input_data = pd.DataFrame({
+    "Turnaround_Time":[turnaround],
+    "Cancelled":[cancelled],
+    "Diverted":[diverted]
+})
+
+input_data[f"Airline_{airline}"] = 1
+input_data[f"Origin_{origin}"] = 1
+input_data[f"Destination_{destination}"] = 1
+input_data[f"Origin_Weather_{origin_weather}"] = 1
+input_data[f"Dest_Weather_{dest_weather}"] = 1
+
+input_data = input_data.reindex(columns=features, fill_value=0)
+
+if st.button("Predict Delay"):
+
+    probability = model.predict_proba(input_data)[0][1]
+
+    st.progress(float(probability))
+
+    st.metric(
+        "Delay Probability",
+        str(round(probability*100,2)) + "%"
     )
 
-    origin = st.sidebar.selectbox(
-        "Origin Airport",
-        ["DEL","BOM","BLR","HYD","MAA","CCU","PNQ","AMD"]
-    )
+    if probability > 0.5:
+        st.error("⚠️ Flight likely delayed")
+    else:
+        st.success("✅ Flight likely on time")
 
-    destination = st.sidebar.selectbox(
-        "Destination Airport",
-        ["DEL","BOM","BLR","HYD","MAA","CCU","PNQ","AMD"]
-    )
+# ---------------- OPERATIONAL ANALYTICS ---------------- #
 
-    if origin == destination:
-        st.sidebar.error("Origin and Destination airports cannot be the same.")
-        st.stop()   
+st.header("📊 Airport Operational Analytics")
 
-    origin_weather = st.sidebar.selectbox(
-        "Origin Weather",
-        ["Clear","Fog","Rain","Storm"]
-    )
+selected_airport = st.selectbox(
+    "Select Airport",
+    sorted(df["Origin"].unique())
+)
 
-    dest_weather = st.sidebar.selectbox(
-        "Destination Weather",
-        ["Clear","Fog","Rain","Storm"]
-    )
+airport_df = df[df["Origin"] == selected_airport]
 
-    turnaround = st.sidebar.slider(
-        "Turnaround Time (minutes)",
-        20,120,40
-    )
+# ---------------- KPIs ---------------- #
 
-    cancelled = st.sidebar.selectbox(
-        "Flight Cancelled",
-        [0,1]
-    )
+col1,col2,col3 = st.columns(3)
 
-    diverted = st.sidebar.selectbox(
-        "Flight Diverted",
-        [0,1]
-    )
+col1.metric(
+    "Total Flights",
+    len(airport_df)
+)
 
-    input_data = pd.DataFrame({
-        "Turnaround_Time":[turnaround],
-        "Cancelled":[cancelled],
-        "Diverted":[diverted]
-    })
+col2.metric(
+    "Average Delay (minutes)",
+    round(airport_df["Total_Delay"].mean(),2)
+)
 
-    input_data[f"Airline_{airline}"] = 1
-    input_data[f"Origin_{origin}"] = 1
-    input_data[f"Destination_{destination}"] = 1
-    input_data[f"Origin_Weather_{origin_weather}"] = 1
-    input_data[f"Dest_Weather_{dest_weather}"] = 1
+col3.metric(
+    "Maximum Delay (minutes)",
+    airport_df["Total_Delay"].max()
+)
 
-    input_data = input_data.reindex(columns=features, fill_value=0)
+# ---------------- DELAY BY AIRLINE ---------------- #
 
-    if st.button("Predict Delay"):
+st.subheader("Average Delay by Airline")
 
-        probability = model.predict_proba(input_data)[0][1]
+fig1 = px.bar(
+    airport_df.groupby("Airline")["Total_Delay"].mean().reset_index(),
+    x="Airline",
+    y="Total_Delay",
+    labels={"Total_Delay":"Average Delay (minutes)"},
+    title="Average Delay by Airline"
+)
 
-        col1,col2 = st.columns(2)
+st.plotly_chart(fig1,use_container_width=True)
 
-        with col1:
+# ---------------- FLIGHT VOLUME ---------------- #
 
-            st.metric(
-                "Delay Probability",
-                str(round(probability*100,2)) + "%"
-            )
+st.subheader("Flight Volume by Destination")
 
-            st.progress(float(probability))
+fig2 = px.bar(
+    airport_df["Destination"].value_counts().reset_index(),
+    x="Destination",
+    y="count",
+    labels={"count":"Number of Flights"},
+    title="Flights by Destination"
+)
 
-            if probability > 0.5:
-                st.error("⚠️ Flight likely DELAYED")
-            else:
-                st.success("✅ Flight likely ON TIME")
+st.plotly_chart(fig2,use_container_width=True)
 
-        with col2:
+# ---------------- DELAY DISTRIBUTION ---------------- #
 
-            st.info(f"""
-            Airline: {airline}
+st.subheader("Flight Delay Distribution")
 
-            Route: {origin} ➜ {destination}
+delay_bins = pd.cut(
+    df["Total_Delay"],
+    bins=[0,15,30,60,120,300],
+    labels=["0-15","15-30","30-60","60-120","120+"]
+)
 
-            Turnaround Time: {turnaround} minutes
-            """)
+dist = delay_bins.value_counts().sort_index().reset_index()
 
-# ================================
-# PAGE 2 : ANALYTICS DASHBOARD
-# ================================
+fig3 = px.bar(
+    dist,
+    x="Total_Delay",
+    y="count",
+    labels={
+        "Total_Delay":"Delay Range (minutes)",
+        "count":"Number of Flights"
+    },
+    title="Distribution of Flight Delays"
+)
 
-if page == "📊 Operations Analytics":
+st.plotly_chart(fig3,use_container_width=True)
 
-    st.title("📊 Airline Operations Analytics Dashboard")
+# ---------------- HEATMAP ---------------- #
 
-    st.write("Exploratory Data Analysis of Indian Airline Operations")
+st.subheader("Airport vs Airline Delay Heatmap")
 
-    # KPIs
-    col1,col2,col3 = st.columns(3)
+heatmap = df.pivot_table(
+    values="Total_Delay",
+    index="Origin",
+    columns="Airline",
+    aggfunc="mean"
+)
 
-    col1.metric(
-        "Total Flights",
-        len(df)
-    )
+fig4 = px.imshow(
+    heatmap,
+    labels=dict(color="Avg Delay (minutes)"),
+    title="Average Delay by Airport and Airline"
+)
 
-    col2.metric(
-        "Average Delay",
-        round(df["Total_Delay"].mean(),2)
-    )
+st.plotly_chart(fig4,use_container_width=True)
 
-    col3.metric(
-        "Maximum Delay",
-        df["Total_Delay"].max()
-    )
+# ---------------- DELAY TREND ---------------- #
 
-    st.divider()
+st.subheader("Flight Delay Trend by Hour")
 
-    # Airport Delay
-    st.subheader("Average Delay by Airport")
+hour_delay = df.groupby("Departure_Hour")["Total_Delay"].mean().reset_index()
 
-    airport_delay = df.groupby("Origin")["Total_Delay"].mean()
+fig5 = px.line(
+    hour_delay,
+    x="Departure_Hour",
+    y="Total_Delay",
+    markers=True,
+    labels={
+        "Departure_Hour":"Hour of Day",
+        "Total_Delay":"Average Delay (minutes)"
+    },
+    title="Average Delay by Departure Hour"
+)
 
-    st.bar_chart(airport_delay)
-
-    # Airline Delay
-    st.subheader("Average Delay by Airline")
-
-    airline_delay = df.groupby("Airline")["Total_Delay"].mean()
-
-    st.bar_chart(airline_delay)
-
-    # Delay Distribution
-    st.subheader("Delay Distribution")
-
-    st.line_chart(df["Total_Delay"])
-
-    # Delay Causes
-    st.subheader("Operational Delay Causes")
-
-    delay_causes = df[[
-        "Weather_Delay",
-        "ATC_Delay",
-        "Technical_Delay",
-        "Crew_Delay",
-        "Reactionary_Delay"
-    ]].mean()
-
-    st.bar_chart(delay_causes)
+st.plotly_chart(fig5,use_container_width=True)
