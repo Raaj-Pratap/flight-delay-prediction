@@ -47,6 +47,10 @@ if page == "✈️ Delay Prediction":
         ["DEL","BOM","BLR","HYD","MAA","CCU","PNQ","AMD"]
     )
 
+    if origin == destination:
+        st.sidebar.error("Origin and Destination airports cannot be the same.")
+        st.stop()   
+
     origin_weather = st.sidebar.selectbox(
         "Origin Weather",
         ["Clear","Fog","Rain","Storm"]
