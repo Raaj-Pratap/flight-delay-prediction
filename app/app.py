@@ -12,6 +12,7 @@
 
 import streamlit as st
 import pandas as pd
+import os
 import joblib
 import datetime
 
@@ -50,8 +51,12 @@ h1, h2, h3 { color: #00BFFF; }
 
 @st.cache_resource
 def load_model():
-    model = joblib.load("F:/Target/PROJECT_2/Models/flight_delay_model.pkl")
-    features = joblib.load("F:/Target/PROJECT_2/Models/model_features.pkl")
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(BASE_DIR, '..', 'Models', 'flight_delay_model.pkl')
+    features_path = os.path.join(BASE_DIR, '..', 'Models', 'model_features.pkl')
+
+    model = joblib.load(model_path)
+    features = joblib.load(features_path)
     if hasattr(features, 'tolist'):
         features = features.tolist()
     return model, features
