@@ -7,7 +7,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, classification_report
 
 # load dataset
-df = pd.read_excel("indian_flight_delay_realistic.xlsx")
+df = pd.read_excel("F:\Target\PROJECT_2\data\indian_flight_delay_realistic.xlsx")
 
 print(df.head())
 print(df.info())
@@ -85,7 +85,6 @@ df_class = df_class.drop(columns=[
 ])
 
 df_class=pd.get_dummies(df_class,columns=['Airline','Origin','Destination','Origin_Weather','Dest_Weather'])
-
 X=df_class.drop(["Delayed"],axis=1)
 y=df_class["Delayed"]
 
