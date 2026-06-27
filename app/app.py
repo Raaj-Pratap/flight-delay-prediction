@@ -64,7 +64,7 @@ def load_model():
 @st.cache_data
 def load_dataset():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    data_path = os.path.join(BASE_DIR, 'indian_flight_delay_realistic.xlsx')
+    data_path = os.path.join(BASE_DIR, '..', 'data', 'indian_flight_delay_realistic.xlsx')
     return pd.read_excel(data_path)
 
 try:
