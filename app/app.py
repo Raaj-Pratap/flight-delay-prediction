@@ -63,8 +63,9 @@ def load_model():
 
 @st.cache_data
 def load_dataset():
-    return pd.read_excel("F:/Target/PROJECT_2/data/indian_flight_delay_realistic.xlsx")
-
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    data_path = os.path.join(BASE_DIR, 'indian_flight_delay_realistic.xlsx')
+    return pd.read_excel(data_path)
 
 try:
     model, features = load_model()
